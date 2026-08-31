@@ -1,10 +1,12 @@
 const express = require('express');
+const authRoutes = require('./src/routes/auth.routes');
 const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/api/auth', authRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
