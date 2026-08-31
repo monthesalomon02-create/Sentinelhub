@@ -1,15 +1,16 @@
 import { Routes, Route } from 'react-router-dom';
 import AuthCallback from './pages/AuthCallback';
-
-function Dashboard() {
-  return <h1>Dashboard (à construire)</h1>;
-}
+import Dashboard from './pages/Dashboard';
 
 function Login() {
   return (
-    <div>
-      <h1>Connexion</h1>
-      <a href="http://localhost:5000/api/auth/github">Se connecter avec GitHub</a>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold mb-6">Inspecteur Mr Code</h1>
+        <a href="http://localhost:5000/api/auth/github" className="bg-gray-900 text-white px-6 py-3 rounded-lg hover:bg-gray-800">
+          Se connecter avec GitHub
+        </a>
+      </div>
     </div>
   );
 }
