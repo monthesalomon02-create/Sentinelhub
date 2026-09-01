@@ -1,4 +1,5 @@
 const prisma = require('../lib/prisma');
+const scanQueue = require('../queues/scan.queue');
 
 async function createProject(req, res) {
   try {
@@ -65,4 +66,37 @@ async function getProject(req, res) {
   }
 }
 
-module.exports = { createProject, listProjects, getProject };
+
+async function triggerScan(req, res) {
+  try {
+    const { id } = req.params;
+
+    const project = await prisma.project.findFirst({
+      where: { id, userId: req.userId },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Projet introuvable' });
+    }
+
+    const scan = await prisma.scan.create({
+      data: {
+        projectId: project.id,
+        status: 'pending',
+      },
+    });
+
+    await scanQueue.add('run-scan', {
+      scanId: scan.id,
+      projectId: project.id,
+      githubRepo: project.githubRepo,
+    });
+
+    res.status(201).json({ scan });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+
+module.exports = { createProject, listProjects, getProject, triggerScan };
