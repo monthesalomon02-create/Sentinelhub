@@ -2,12 +2,9 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 
-
-
 function computeSecuritySummary(results) {
   if (!results) return null;
 
-  // Compte les vulnérabilités de dépendances (toutes locations confondues)
   let critical = 0, high = 0, moderate = 0, low = 0;
   results.dependencies?.locations?.forEach((loc) => {
     const v = loc.audit?.metadata?.vulnerabilities;
@@ -21,21 +18,17 @@ function computeSecuritySummary(results) {
 
   const secretsFound = results.secrets?.secretsFound || 0;
 
-  // Score sécurité : pénalise selon la gravité
   let securityScore = 100 - (critical * 20 + high * 10 + moderate * 5 + low * 2 + secretsFound * 15);
   securityScore = Math.max(0, Math.min(100, securityScore));
 
-  // Score qualité de code
   const errorCount = results.codeQuality?.errorCount || 0;
   const warningCount = results.codeQuality?.warningCount || 0;
   let codeQualityScore = 100 - (errorCount * 3 + warningCount * 1);
   codeQualityScore = Math.max(0, Math.min(100, codeQualityScore));
 
-  // Statut Docker
   const dockerIssues = results.docker?.locations?.some((loc) => loc.issues.length > 0);
   const dockerStatus = !results.docker?.dockerfileFound ? 'none' : dockerIssues ? 'warning' : 'ok';
 
-  // Statut CI/CD
   const cicdIssues = results.cicd?.workflows?.some((wf) => wf.issues.length > 0 || wf.parseError);
   const cicdStatus = !results.cicd?.found ? 'none' : cicdIssues ? 'warning' : 'ok';
 
@@ -102,6 +95,131 @@ function StatusBadge({ status }) {
   );
 }
 
+function VulnerabilitiesSection({ vulnerabilities }) {
+  const [expanded, setExpanded] = useState(false);
+  const entries = Object.entries(vulnerabilities || {});
+
+  if (entries.length === 0) return null;
+
+  const severityColor = {
+    critical: 'text-red-700 bg-red-100',
+    high: 'text-orange-700 bg-orange-100',
+    moderate: 'text-yellow-700 bg-yellow-100',
+    low: 'text-blue-700 bg-blue-100',
+  };
+
+  return (
+    <div className="mt-2">
+      <button onClick={() => setExpanded((prev) => !prev)} className="text-xs text-terracotta-600 hover:text-terracotta-700 font-medium">
+        {expanded ? 'Masquer les vulnérabilités' : `Voir les ${entries.length} vulnérabilité(s)`}
+      </button>
+      {expanded && (
+        <ul className="space-y-3 mt-2">
+          {entries.map(([pkgName, info]) => {
+            const advisory = Array.isArray(info.via) ? info.via.find((v) => typeof v === 'object') : null;
+            const fixText = info.fixAvailable
+              ? typeof info.fixAvailable === 'object'
+                ? `Correction : passer à ${info.fixAvailable.name}@${info.fixAvailable.version}`
+                : 'Correction disponible via npm audit fix'
+              : 'Aucune correction automatique disponible';
+            return (
+              <li key={pkgName} className="text-sm border-l-2 border-terracotta-300 pl-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium">{pkgName}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${severityColor[info.severity] || 'text-gray-700 bg-gray-100'}`}>
+                    {info.severity}
+                  </span>
+                </div>
+                {advisory?.title && <p className="text-ink-600 mt-1">{advisory.title}</p>}
+                <p className="text-ink-500 text-xs mt-1">{fixText}</p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CodeQualityIssuesSection({ issues }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!issues || issues.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <button onClick={() => setExpanded((prev) => !prev)} className="text-xs text-terracotta-600 hover:text-terracotta-700 font-medium">
+        {expanded ? 'Masquer les erreurs' : `Voir les ${issues.length} erreur(s)`}
+      </button>
+      {expanded && (
+        <ul className="space-y-1 text-sm mt-2">
+          {issues.map((issue, i) => (
+            <li key={i} className="text-gray-700">
+              <span className="font-mono">{issue.file}:{issue.line}</span> — {issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function DockerIssuesSection({ issues }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!issues || issues.length === 0) {
+    return <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>;
+  }
+
+  return (
+    <div className="pl-4">
+      <button onClick={() => setExpanded((prev) => !prev)} className="text-xs text-terracotta-600 hover:text-terracotta-700 font-medium">
+        {expanded ? 'Masquer les problèmes' : `Voir les ${issues.length} problème(s)`}
+      </button>
+      {expanded && (
+        <ul className="space-y-1 text-sm mt-2">
+          {issues.map((issue, j) => (
+            <li key={j} className="text-gray-700">
+              <span className="uppercase text-xs font-medium text-orange-600">{issue.level}</span>{' '}
+              L{issue.line} ({issue.rule}) — {issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CicdIssuesSection({ workflow }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (workflow.parseError) {
+    return <p className="text-red-600 text-sm pl-4">Erreur de parsing : {workflow.parseError}</p>;
+  }
+
+  if (!workflow.issues || workflow.issues.length === 0) {
+    return <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>;
+  }
+
+  return (
+    <div className="pl-4">
+      <button onClick={() => setExpanded((prev) => !prev)} className="text-xs text-terracotta-600 hover:text-terracotta-700 font-medium">
+        {expanded ? 'Masquer les problèmes' : `Voir les ${workflow.issues.length} problème(s)`}
+      </button>
+      {expanded && (
+        <ul className="space-y-1 text-sm mt-2">
+          {workflow.issues.map((issue, j) => (
+            <li key={j} className="text-gray-700">
+              <span className="uppercase text-xs font-medium text-orange-600">{issue.severity}</span>{' '}
+              {issue.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function ScanResults({ results }) {
   if (!results) return null;
   const dependencies = results.dependencies;
@@ -115,20 +233,23 @@ function ScanResults({ results }) {
       <div className="bg-gray-50 rounded p-4">
         <h4 className="font-medium mb-2">Dépendances</h4>
         {dependencies?.found ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {dependencies.locations.map((loc, i) => {
               const meta = loc.audit?.metadata;
               const vulns = meta?.vulnerabilities;
               return (
                 <div key={i}>
                   <p className="text-sm font-medium text-gray-600 mb-1">📁 {loc.location}</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm pl-4">
+                  <div className="grid grid-cols-2 gap-2 text-sm pl-4 mb-2">
                     <p>Total dépendances : {meta?.dependencies?.total ?? '—'}</p>
                     <p>Vulnérabilités totales : {vulns?.total ?? 0}</p>
                     <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
                     <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
                     <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
                     <p className="text-terracotta-600">Low : {vulns?.low ?? 0}</p>
+                  </div>
+                  <div className="pl-4">
+                    <VulnerabilitiesSection vulnerabilities={loc.audit?.vulnerabilities} />
                   </div>
                 </div>
               );
@@ -172,15 +293,7 @@ function ScanResults({ results }) {
               <p className="text-red-600">Erreurs : {codeQuality.errorCount}</p>
               <p className="text-yellow-600">Warnings : {codeQuality.warningCount}</p>
             </div>
-            {codeQuality.issues?.length > 0 && (
-              <ul className="space-y-1 text-sm mt-2">
-                {codeQuality.issues.map((issue, i) => (
-                  <li key={i} className="text-gray-700">
-                    <span className="font-mono">{issue.file}:{issue.line}</span> — {issue.message}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <CodeQualityIssuesSection issues={codeQuality.issues} />
           </div>
         ) : (
           <p className="text-sm text-gray-500">Pas de données.</p>
@@ -194,18 +307,7 @@ function ScanResults({ results }) {
             {docker.locations.map((loc, i) => (
               <div key={i}>
                 <p className="text-sm font-medium text-gray-600 mb-1">📁 {loc.location}</p>
-                {loc.issues.length > 0 ? (
-                  <ul className="space-y-1 text-sm pl-4">
-                    {loc.issues.map((issue, j) => (
-                      <li key={j} className="text-gray-700">
-                        <span className="uppercase text-xs font-medium text-orange-600">{issue.level}</span>{' '}
-                        L{issue.line} ({issue.rule}) — {issue.message}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>
-                )}
+                <DockerIssuesSection issues={loc.issues} />
               </div>
             ))}
           </div>
@@ -221,20 +323,7 @@ function ScanResults({ results }) {
             {cicd.workflows.map((wf, i) => (
               <div key={i}>
                 <p className="text-sm font-medium text-gray-600 mb-1">⚙ {wf.file}</p>
-                {wf.parseError ? (
-                  <p className="text-red-600 text-sm pl-4">Erreur de parsing : {wf.parseError}</p>
-                ) : wf.issues.length > 0 ? (
-                  <ul className="space-y-1 text-sm pl-4">
-                    {wf.issues.map((issue, j) => (
-                      <li key={j} className="text-gray-700">
-                        <span className="uppercase text-xs font-medium text-orange-600">{issue.severity}</span>{' '}
-                        {issue.message}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>
-                )}
+                <CicdIssuesSection workflow={wf} />
               </div>
             ))}
           </div>
@@ -306,10 +395,11 @@ function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-function handleLogout() {
-  localStorage.removeItem('token');
-  navigate('/login');
-}
+  function handleLogout() {
+    localStorage.removeItem('token');
+    navigate('/login');
+  }
+
   const [project, setProject] = useState(null);
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -356,14 +446,14 @@ function handleLogout() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-  <Link to="/dashboard" className="text-terracotta-600 text-sm hover:text-terracotta-700">&larr; Retour</Link>
-  <button
-    onClick={handleLogout}
-    className="text-ink-600 text-sm hover:text-ink-800"
-  >
-    Déconnexion
-  </button>
-</div>
+        <Link to="/dashboard" className="text-terracotta-600 text-sm hover:text-terracotta-700">&larr; Retour</Link>
+        <button
+          onClick={handleLogout}
+          className="text-ink-600 text-sm hover:text-ink-800"
+        >
+          Déconnexion
+        </button>
+      </div>
       <div className="flex items-center justify-between mt-2 mb-6">
         <h1 className="text-2xl font-bold">{project.name}</h1>
         <button
