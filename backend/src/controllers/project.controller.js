@@ -1,5 +1,6 @@
 const prisma = require('../lib/prisma');
 const scanQueue = require('../queues/scan.queue');
+const { explainScanResults } = require('../lib/mistral');
 
 async function createProject(req, res) {
   try {
@@ -140,5 +141,28 @@ async function getScan(req, res) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 }
+async function explainScan(req, res) {
+  try {
+    const { id, scanId } = req.params;
 
-module.exports = { createProject, listProjects, getProject, triggerScan, listScans, getScan };
+    const scan = await prisma.scan.findFirst({
+      where: { id: scanId, projectId: id, project: { userId: req.userId } },
+    });
+
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan introuvable' });
+    }
+
+    if (scan.status !== 'completed') {
+      return res.status(400).json({ error: 'Le scan doit être terminé pour être expliqué' });
+    }
+
+    const explanation = await explainScanResults(scan.results);
+
+    res.json({ explanation });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur lors de la génération de l\'explication' });
+  }
+}
+module.exports = { createProject, listProjects, getProject, triggerScan, listScans, getScan, explainScan };

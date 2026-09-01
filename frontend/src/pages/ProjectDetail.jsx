@@ -160,6 +160,62 @@ function ScanResults({ results }) {
   );
 }
 
+function ScanCard({ scan }) {
+  const [explanation, setExplanation] = useState(null);
+  const [explaining, setExplaining] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleExplain() {
+    try {
+      setExplaining(true);
+      setError(null);
+      const data = await apiFetch(`/projects/${scan.projectId}/scans/${scan.id}/explain`, {
+        method: 'POST',
+      });
+      setExplanation(data.explanation);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExplaining(false);
+    }
+  }
+
+  return (
+    <li className="border rounded-lg p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-500">
+          {new Date(scan.createdAt).toLocaleString()}
+        </span>
+        <StatusBadge status={scan.status} />
+      </div>
+      {scan.status === 'failed' && (
+        <p className="text-red-600 text-sm mt-2">{scan.errorMessage}</p>
+      )}
+      {scan.status === 'completed' && (
+        <>
+          <ScanResults results={scan.results} />
+          {!explanation && (
+            <button
+              onClick={handleExplain}
+              disabled={explaining}
+              className="mt-3 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
+            >
+              {explaining ? 'Analyse en cours...' : '✨ Expliquer ce scan (IA)'}
+            </button>
+          )}
+          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+          {explanation && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-4">
+              <h4 className="font-medium mb-2 text-purple-900">✨ Explication IA</h4>
+              <div className="text-sm text-gray-800 whitespace-pre-wrap">{explanation}</div>
+            </div>
+          )}
+        </>
+      )}
+    </li>
+  );
+}
+
 function ProjectDetail() {
   const { id } = useParams();
   const [project, setProject] = useState(null);
@@ -224,18 +280,7 @@ function ProjectDetail() {
       ) : (
         <ul className="space-y-4">
           {scans.map((scan) => (
-            <li key={scan.id} className="border rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  {new Date(scan.createdAt).toLocaleString()}
-                </span>
-                <StatusBadge status={scan.status} />
-              </div>
-              {scan.status === 'failed' && (
-                <p className="text-red-600 text-sm mt-2">{scan.errorMessage}</p>
-              )}
-              {scan.status === 'completed' && <ScanResults results={scan.results} />}
-            </li>
+            <ScanCard key={scan.id} scan={scan} />
           ))}
         </ul>
       )}
