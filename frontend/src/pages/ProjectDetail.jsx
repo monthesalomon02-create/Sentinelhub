@@ -20,22 +20,49 @@ function ScanResults({ results }) {
   if (!results) return null;
   const meta = results.dependencies?.metadata;
   const vulns = meta?.vulnerabilities;
+  const secrets = results.secrets;
 
   return (
-    <div className="mt-3 bg-gray-50 rounded p-4">
-      <h4 className="font-medium mb-2">Dépendances</h4>
-      {meta ? (
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <p>Total dépendances : {meta.dependencies?.total ?? '—'}</p>
-          <p>Vulnérabilités totales : {vulns?.total ?? 0}</p>
-          <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
-          <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
-          <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
-          <p className="text-blue-600">Low : {vulns?.low ?? 0}</p>
-        </div>
-      ) : (
-        <p className="text-sm text-gray-500">Pas de données de dépendances.</p>
-      )}
+    <div className="mt-3 space-y-3">
+      <div className="bg-gray-50 rounded p-4">
+        <h4 className="font-medium mb-2">Dépendances</h4>
+        {meta ? (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <p>Total dépendances : {meta.dependencies?.total ?? '—'}</p>
+            <p>Vulnérabilités totales : {vulns?.total ?? 0}</p>
+            <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
+            <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
+            <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
+            <p className="text-blue-600">Low : {vulns?.low ?? 0}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Pas de données de dépendances.</p>
+        )}
+      </div>
+
+      <div className="bg-gray-50 rounded p-4">
+        <h4 className="font-medium mb-2">Secrets exposés</h4>
+        {secrets ? (
+          secrets.secretsFound > 0 ? (
+            <div>
+              <p className="text-red-600 font-medium text-sm mb-2">
+                ⚠ {secrets.secretsFound} secret(s) détecté(s)
+              </p>
+              <ul className="space-y-1 text-sm">
+                {secrets.findings.map((f, i) => (
+                  <li key={i} className="text-gray-700">
+                    <span className="font-mono">{f.file}:{f.line}</span> — {f.rule}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-green-600 text-sm">✓ Aucun secret détecté</p>
+          )
+        ) : (
+          <p className="text-sm text-gray-500">Pas de données.</p>
+        )}
+      </div>
     </div>
   );
 }
