@@ -98,5 +98,47 @@ async function triggerScan(req, res) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 }
+async function listScans(req, res) {
+  try {
+    const { id } = req.params;
 
-module.exports = { createProject, listProjects, getProject, triggerScan };
+    const project = await prisma.project.findFirst({
+      where: { id, userId: req.userId },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Projet introuvable' });
+    }
+
+    const scans = await prisma.scan.findMany({
+      where: { projectId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ scans });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+
+async function getScan(req, res) {
+  try {
+    const { id, scanId } = req.params;
+
+    const scan = await prisma.scan.findFirst({
+      where: { id: scanId, projectId: id, project: { userId: req.userId } },
+    });
+
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan introuvable' });
+    }
+
+    res.json({ scan });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+
+module.exports = { createProject, listProjects, getProject, triggerScan, listScans, getScan };

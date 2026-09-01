@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
+import ProjectDetail from './pages/ProjectDetail';
 
 function Login() {
   return (
@@ -22,6 +23,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/projects/:id" element={<ProjectDetail />} />
     </Routes>
   );
 }

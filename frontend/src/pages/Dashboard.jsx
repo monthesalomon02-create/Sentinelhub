@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { Link } from 'react-router-dom';
 
 function Dashboard() {
   const [repos, setRepos] = useState([]);
   const [connectedRepos, setConnectedRepos] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectingId, setConnectingId] = useState(null);
@@ -22,6 +24,7 @@ function Dashboard() {
 
       setRepos(reposData.repos);
       setConnectedRepos(projectsData.projects.map((p) => p.githubRepo));
+      setProjects(projectsData.projects);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -30,22 +33,23 @@ function Dashboard() {
   }
 
   async function handleConnect(repo) {
-    try {
-      setConnectingId(repo.id);
-      await apiFetch('/projects', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: repo.name,
-          githubRepo: repo.fullName,
-        }),
-      });
-      setConnectedRepos((prev) => [...prev, repo.fullName]);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setConnectingId(null);
-    }
+  try {
+    setConnectingId(repo.id);
+    const data = await apiFetch('/projects', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: repo.name,
+        githubRepo: repo.fullName,
+      }),
+    });
+    setConnectedRepos((prev) => [...prev, repo.fullName]);
+    setProjects((prev) => [...prev, data.project]);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setConnectingId(null);
   }
+}
 
   if (loading) return <p className="p-8">Chargement de tes repos...</p>;
   if (error) return <p className="p-8 text-red-600">Erreur : {error}</p>;
@@ -68,11 +72,14 @@ function Dashboard() {
                   {new Date(repo.updatedAt).toLocaleDateString()}
                 </p>
               </div>
-              {isConnected ? (
-                <span className="text-green-600 text-sm font-medium">
-                  ✓ Connecté
-                </span>
-              ) : (
+             {isConnected ? (
+  <Link
+    to={`/projects/${projects.find((p) => p.githubRepo === repo.fullName)?.id}`}
+    className="text-green-600 text-sm font-medium hover:underline"
+  >
+    ✓ Voir le projet
+  </Link>
+) : (
                 <button
                   onClick={() => handleConnect(repo)}
                   disabled={connectingId === repo.id}
