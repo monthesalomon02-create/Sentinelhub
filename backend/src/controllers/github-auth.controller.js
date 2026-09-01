@@ -78,7 +78,7 @@ async function githubCallback(req, res) {
     });
 
     // Redirige vers le frontend avec le token (le frontend le récupérera depuis l'URL)
-    res.redirect(`http://localhost:5180/auth/callback?token=${appToken}`);
+   res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${appToken}`);
   } catch (error) {
     console.error(error.response?.data || error.message);
     res.status(500).json({ error: 'Erreur lors de l\'authentification GitHub' });

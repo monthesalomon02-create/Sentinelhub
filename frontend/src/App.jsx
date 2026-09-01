@@ -68,7 +68,7 @@ function Login() {
             Connecte ton dépôt GitHub et laisse l'inspecteur passer ton code à la loupe : dépendances, secrets, qualité, Docker et CI/CD.
           </p>
           
-           <a href="http://localhost:5000/api/auth/github" className="inline-block bg-ink-800 text-white px-6 py-3 rounded-lg hover:bg-ink-900">
+           <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/github`} className="inline-block bg-ink-800 text-white px-6 py-3 rounded-lg hover:bg-ink-900">
   Se connecter avec GitHub
 </a>
         </div>

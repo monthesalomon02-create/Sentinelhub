@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const app = express();
 app.disable('x-powered-by');
-app.use(cors({ origin: 'http://localhost:5180' }));
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5180' }));
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/github', githubRoutes);
