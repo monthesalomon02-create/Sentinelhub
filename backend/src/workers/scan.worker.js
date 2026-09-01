@@ -11,9 +11,10 @@ const prisma = require('../lib/prisma');
 const { ESLint } = require('eslint');
 const js = require('@eslint/js');
 const sonarjs = require('eslint-plugin-sonarjs');
-const yaml = require('js-yaml'); 
+const yaml = require('js-yaml');
 
 const execAsync = promisify(exec);
+
 // Cherche tous les dossiers contenant un fichier donné (ex: package.json, Dockerfile),
 // en excluant node_modules, .git et autres dossiers non pertinents
 async function findDirsWithFile(rootPath, targetFile, maxDepth = 3) {
@@ -47,7 +48,7 @@ async function runNpmAuditInDir(dirPath) {
       cwd: dirPath,
       timeout: 60000,
     });
-  } catch (err) {
+  } catch {
     // On continue même si ça échoue partiellement
   }
 
@@ -85,6 +86,7 @@ async function runNpmAudit(repoPath) {
 
   return { found: true, locations: results };
 }
+
 async function runGitleaks(repoPath) {
   try {
     const reportPath = path.join(repoPath, 'gitleaks-report.json');
@@ -129,12 +131,11 @@ async function runEslint(repoPath) {
             ecmaVersion: 'latest',
             sourceType: 'module',
             globals: {
-              window: 'readonly',
-              document: 'readonly',
-              console: 'readonly',
-              process: 'readonly',
-              module: 'readonly',
-              require: 'readonly',
+              window: 'readonly', document: 'readonly', console: 'readonly',
+              process: 'readonly', module: 'readonly', require: 'readonly',
+              URLSearchParams: 'readonly', fetch: 'readonly', localStorage: 'readonly',
+              Buffer: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly',
+              setInterval: 'readonly', clearInterval: 'readonly',
             },
           },
         },
@@ -176,6 +177,7 @@ function summarizeEslint(eslintOutput) {
     issues: issues.slice(0, 50), // on limite pour ne pas exploser la taille du résultat stocké
   };
 }
+
 async function runHadolintInDir(dirPath) {
   try {
     const { stdout } = await execAsync('hadolint --format json Dockerfile', {
@@ -223,6 +225,7 @@ async function runHadolint(repoPath) {
 
   return { dockerfileFound: true, locations: results };
 }
+
 async function runCicdAnalysis(repoPath) {
   const workflowsDir = path.join(repoPath, '.github', 'workflows');
   const exists = await fs.pathExists(workflowsDir);
@@ -259,8 +262,14 @@ async function runCicdAnalysis(repoPath) {
         }
       }
 
-      // Vérifie l'usage de secrets en clair dans des commandes run (pattern basique)
-      if (/run:\s*.*\$\{\{\s*secrets\./i.test(content) && /echo|print/i.test(content)) {
+      // Vérifie l'usage de secrets en clair dans des commandes run (pattern basique, ligne par ligne)
+      const lines = content.split('\n');
+      const hasExposedSecret = lines.some((line) => {
+        const hasSecret = line.includes('${{') && line.includes('secrets.');
+        const hasEcho = /echo|print/i.test(line);
+        return hasSecret && hasEcho;
+      });
+      if (hasExposedSecret) {
         issues.push({
           severity: 'warning',
           message: 'Un secret semble être affiché (echo/print) dans une commande — risque de fuite dans les logs CI.',
@@ -321,10 +330,10 @@ async function processScan(job) {
     // Analyse : secrets (gitleaks)
     const gitleaksResults = await runGitleaks(tempDir);
 
-       // Analyse : qualité de code (ESLint)
+    // Analyse : qualité de code (ESLint)
     const eslintResults = await runEslint(tempDir);
 
-       // Analyse : Dockerfile (Hadolint)
+    // Analyse : Dockerfile (Hadolint)
     const dockerResults = await runHadolint(tempDir);
 
     // Analyse : configuration CI/CD (GitHub Actions)
