@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+
+
 
 function computeSecuritySummary(results) {
   if (!results) return null;
@@ -89,7 +91,7 @@ function SecuritySummaryCard({ results }) {
 function StatusBadge({ status }) {
   const styles = {
     pending: 'bg-gray-100 text-gray-700',
-    running: 'bg-blue-100 text-blue-700',
+    running: 'bg-terracotta-100 text-terracotta-700',
     completed: 'bg-green-100 text-green-700',
     failed: 'bg-red-100 text-red-700',
   };
@@ -126,7 +128,7 @@ function ScanResults({ results }) {
                     <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
                     <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
                     <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
-                    <p className="text-blue-600">Low : {vulns?.low ?? 0}</p>
+                    <p className="text-terracotta-600">Low : {vulns?.low ?? 0}</p>
                   </div>
                 </div>
               );
@@ -282,15 +284,15 @@ function ScanCard({ scan }) {
             <button
               onClick={handleExplain}
               disabled={explaining}
-              className="mt-3 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 disabled:opacity-50"
+              className="mt-3 bg-terracotta-600 text-white px-4 py-2 rounded text-sm hover:bg-terracotta-700 disabled:opacity-50"
             >
               {explaining ? 'Analyse en cours...' : '✨ Expliquer ce scan (IA)'}
             </button>
           )}
           {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
           {explanation && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-4">
-              <h4 className="font-medium mb-2 text-purple-900">✨ Explication IA</h4>
+            <div className="mt-3 bg-terracotta-50 border border-terracotta-200 rounded p-4">
+              <h4 className="font-medium mb-2 text-terracotta-900">✨ Explication IA</h4>
               <div className="text-sm text-gray-800 whitespace-pre-wrap">{explanation}</div>
             </div>
           )}
@@ -302,6 +304,12 @@ function ScanCard({ scan }) {
 
 function ProjectDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+
+function handleLogout() {
+  localStorage.removeItem('token');
+  navigate('/login');
+}
   const [project, setProject] = useState(null);
   const [scans, setScans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -347,13 +355,21 @@ function ProjectDetail() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <Link to="/dashboard" className="text-blue-600 text-sm">&larr; Retour</Link>
+      <div className="flex items-center justify-between">
+  <Link to="/dashboard" className="text-terracotta-600 text-sm hover:text-terracotta-700">&larr; Retour</Link>
+  <button
+    onClick={handleLogout}
+    className="text-ink-600 text-sm hover:text-ink-800"
+  >
+    Déconnexion
+  </button>
+</div>
       <div className="flex items-center justify-between mt-2 mb-6">
         <h1 className="text-2xl font-bold">{project.name}</h1>
         <button
           onClick={handleTriggerScan}
           disabled={triggering}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-terracotta-600 text-white px-4 py-2 rounded hover:bg-terracotta-700 disabled:opacity-50"
         >
           {triggering ? 'Lancement...' : 'Lancer un scan'}
         </button>

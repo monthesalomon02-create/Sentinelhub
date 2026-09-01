@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Fond crème chaud */
+  --color-cream-50: #fdf8f3;
+  --color-cream-100: #f7ede1;
+  --color-cream-200: #ecdfd2;
+  --color-cream-300: #ddc9b4;
+
+  /* Terracotta — accent principal */
+  --color-terracotta-50: #fdf1ee;
+  --color-terracotta-100: #f7e0d8;
+  --color-terracotta-200: #efc0b2;
+  --color-terracotta-400: #d97350;
+  --color-terracotta-500: #c2542f;
+  --color-terracotta-600: #a8442a;
+  --color-terracotta-700: #883521;
+  --color-terracotta-800: #692817;
+  --color-terracotta-900: #4a2317;
+
+  /* Texte brun chaud plutôt que gris/noir pur */
+  --color-ink-400: #a8896f;
+  --color-ink-500: #8a6d54;
+  --color-ink-600: #6b533d;
+  --color-ink-700: #4d3b2b;
+  --color-ink-800: #3d2b1f;
+  --color-ink-900: #2b1d13;
+
+  /* Vert sauge — succès/validé, reste dans la même famille chaude */
+  --color-sage-500: #7a9471;
+  --color-sage-600: #5e7856;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream-50);
+  color: var(--color-ink-800);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}

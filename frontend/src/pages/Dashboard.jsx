@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 function Dashboard() {
   const [repos, setRepos] = useState([]);
@@ -9,6 +9,12 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [connectingId, setConnectingId] = useState(null);
+  const navigate = useNavigate();
+
+function handleLogout() {
+  localStorage.removeItem('token');
+  navigate('/login');
+}
 
   useEffect(() => {
     loadData();
@@ -56,7 +62,15 @@ function Dashboard() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Tes repos GitHub</h1>
+      <div className="flex items-center justify-between mb-6">
+  <h1 className="text-2xl font-bold">Tes repos GitHub</h1>
+  <button
+    onClick={handleLogout}
+    className="text-ink-600 text-sm hover:text-ink-800"
+  >
+    Déconnexion
+  </button>
+</div>
       <ul className="space-y-3">
         {repos.map((repo) => {
           const isConnected = connectedRepos.includes(repo.fullName);
@@ -75,7 +89,7 @@ function Dashboard() {
              {isConnected ? (
   <Link
     to={`/projects/${projects.find((p) => p.githubRepo === repo.fullName)?.id}`}
-    className="text-green-600 text-sm font-medium hover:underline"
+    className="text-terracotta-600 text-sm font-medium hover:text-terracotta-700 hover:underline"
   >
     ✓ Voir le projet
   </Link>
@@ -83,7 +97,7 @@ function Dashboard() {
                 <button
                   onClick={() => handleConnect(repo)}
                   disabled={connectingId === repo.id}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                 className="bg-terracotta-500 text-white px-4 py-2 rounded hover:bg-terracotta-600 disabled:opacity-50"
                 >
                   {connectingId === repo.id ? 'Connexion...' : 'Connecter'}
                 </button>
