@@ -3,8 +3,9 @@ const IORedis = require('ioredis');
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null, // requis par BullMQ
   enableReadyCheck: false,
+  tls: {}, // force explicitement TLS, requis par Upstash même avec rediss://
   retryStrategy(times) {
-    return Math.min(times * 200, 2000); // reconnexion progressive
+    return Math.min(times * 200, 2000);
   },
 });
 
