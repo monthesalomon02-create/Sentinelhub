@@ -8,6 +8,9 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const connection = require('../lib/redis');
 const prisma = require('../lib/prisma');
+const { ESLint } = require('eslint');
+const js = require('@eslint/js');
+const sonarjs = require('eslint-plugin-sonarjs');
 
 const execAsync = promisify(exec);
 
@@ -41,6 +44,7 @@ async function runNpmAudit(repoPath) {
     return { error: err.message };
   }
 }
+
 async function runGitleaks(repoPath) {
   try {
     const reportPath = path.join(repoPath, 'gitleaks-report.json');
@@ -70,6 +74,69 @@ async function runGitleaks(repoPath) {
     return { error: err.message, secretsFound: 0, findings: [] };
   }
 }
+
+async function runEslint(repoPath) {
+  try {
+    const eslint = new ESLint({
+      cwd: repoPath,
+      overrideConfigFile: true,
+      overrideConfig: [
+        js.configs.recommended,
+        {
+          plugins: { sonarjs },
+          rules: { ...sonarjs.configs.recommended.rules },
+          languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: {
+              window: 'readonly',
+              document: 'readonly',
+              console: 'readonly',
+              process: 'readonly',
+              module: 'readonly',
+              require: 'readonly',
+            },
+          },
+        },
+      ],
+      errorOnUnmatchedPattern: false,
+    });
+
+    const results = await eslint.lintFiles(['**/*.js', '**/*.jsx']);
+    return summarizeEslint(results);
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+function summarizeEslint(eslintOutput) {
+  let errorCount = 0;
+  let warningCount = 0;
+  const issues = [];
+
+  for (const file of eslintOutput) {
+    errorCount += file.errorCount;
+    warningCount += file.warningCount;
+
+    for (const msg of file.messages) {
+      issues.push({
+        file: file.filePath.split(/[\\/]/).slice(-3).join('/'), // chemin relatif court
+        line: msg.line,
+        rule: msg.ruleId,
+        severity: msg.severity === 2 ? 'error' : 'warning',
+        message: msg.message,
+      });
+    }
+  }
+
+  return {
+    errorCount,
+    warningCount,
+    filesAnalyzed: eslintOutput.length,
+    issues: issues.slice(0, 50), // on limite pour ne pas exploser la taille du résultat stocké
+  };
+}
+
 async function processScan(job) {
   const { scanId, githubRepo } = job.data;
   const tempDir = path.join(os.tmpdir(), `scan-${scanId}`);
@@ -85,13 +152,20 @@ async function processScan(job) {
       where: { id: scanId },
       include: { project: { include: { user: true } } },
     });
-
     const token = scan.project.user.githubAccessToken;
-    const cloneUrl = `https://${token}@github.com/${githubRepo}.git`;
+    const cloneUrl = `https://x-access-token:${token}@github.com/${githubRepo}.git`;
 
-    // Clone dans un dossier temporaire
+    // Nettoie un éventuel résidu d'un scan précédent qui aurait échoué avant le cleanup
+    await fs.remove(tempDir);
     await fs.ensureDir(tempDir);
-    const git = simpleGit();
+
+    process.env.GIT_TERMINAL_PROMPT = '0'; // interdit tout prompt interactif Git
+    const git = simpleGit({
+      config: ['credential.helper='],
+      unsafe: {
+        allowUnsafeCredentialHelper: true,
+      },
+    });
     await git.clone(cloneUrl, tempDir, ['--depth', '1']);
 
     // Analyse : dépendances (npm audit)
@@ -100,9 +174,13 @@ async function processScan(job) {
     // Analyse : secrets (gitleaks)
     const gitleaksResults = await runGitleaks(tempDir);
 
+    // Analyse : qualité de code (ESLint)
+    const eslintResults = await runEslint(tempDir);
+
     const results = {
       dependencies: auditResults,
       secrets: gitleaksResults,
+      codeQuality: eslintResults,
     };
 
     await prisma.scan.update({

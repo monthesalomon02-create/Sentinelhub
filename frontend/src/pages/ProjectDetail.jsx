@@ -21,6 +21,7 @@ function ScanResults({ results }) {
   const meta = results.dependencies?.metadata;
   const vulns = meta?.vulnerabilities;
   const secrets = results.secrets;
+  const codeQuality = results.codeQuality;
 
   return (
     <div className="mt-3 space-y-3">
@@ -59,6 +60,30 @@ function ScanResults({ results }) {
           ) : (
             <p className="text-green-600 text-sm">✓ Aucun secret détecté</p>
           )
+        ) : (
+          <p className="text-sm text-gray-500">Pas de données.</p>
+        )}
+      </div>
+
+      <div className="bg-gray-50 rounded p-4">
+        <h4 className="font-medium mb-2">Qualité de code</h4>
+        {codeQuality ? (
+          <div>
+            <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+              <p>Fichiers analysés : {codeQuality.filesAnalyzed}</p>
+              <p className="text-red-600">Erreurs : {codeQuality.errorCount}</p>
+              <p className="text-yellow-600">Warnings : {codeQuality.warningCount}</p>
+            </div>
+            {codeQuality.issues?.length > 0 && (
+              <ul className="space-y-1 text-sm mt-2">
+                {codeQuality.issues.map((issue, i) => (
+                  <li key={i} className="text-gray-700">
+                    <span className="font-mono">{issue.file}:{issue.line}</span> — {issue.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         ) : (
           <p className="text-sm text-gray-500">Pas de données.</p>
         )}
