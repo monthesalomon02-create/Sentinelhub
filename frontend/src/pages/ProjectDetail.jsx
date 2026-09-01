@@ -2,6 +2,90 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 
+function computeSecuritySummary(results) {
+  if (!results) return null;
+
+  // Compte les vulnérabilités de dépendances (toutes locations confondues)
+  let critical = 0, high = 0, moderate = 0, low = 0;
+  results.dependencies?.locations?.forEach((loc) => {
+    const v = loc.audit?.metadata?.vulnerabilities;
+    if (v) {
+      critical += v.critical || 0;
+      high += v.high || 0;
+      moderate += v.moderate || 0;
+      low += v.low || 0;
+    }
+  });
+
+  const secretsFound = results.secrets?.secretsFound || 0;
+
+  // Score sécurité : pénalise selon la gravité
+  let securityScore = 100 - (critical * 20 + high * 10 + moderate * 5 + low * 2 + secretsFound * 15);
+  securityScore = Math.max(0, Math.min(100, securityScore));
+
+  // Score qualité de code
+  const errorCount = results.codeQuality?.errorCount || 0;
+  const warningCount = results.codeQuality?.warningCount || 0;
+  let codeQualityScore = 100 - (errorCount * 3 + warningCount * 1);
+  codeQualityScore = Math.max(0, Math.min(100, codeQualityScore));
+
+  // Statut Docker
+  const dockerIssues = results.docker?.locations?.some((loc) => loc.issues.length > 0);
+  const dockerStatus = !results.docker?.dockerfileFound ? 'none' : dockerIssues ? 'warning' : 'ok';
+
+  // Statut CI/CD
+  const cicdIssues = results.cicd?.workflows?.some((wf) => wf.issues.length > 0 || wf.parseError);
+  const cicdStatus = !results.cicd?.found ? 'none' : cicdIssues ? 'warning' : 'ok';
+
+  return {
+    critical, high, moderate, low,
+    securityScore, codeQualityScore,
+    dockerStatus, cicdStatus,
+  };
+}
+
+function SecuritySummaryCard({ results }) {
+  const summary = computeSecuritySummary(results);
+  if (!summary) return null;
+
+  const statusIcon = { ok: '✓', warning: '⚠', none: '—' };
+  const statusColor = { ok: 'text-green-600', warning: 'text-orange-600', none: 'text-gray-400' };
+
+  return (
+    <div className="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6">
+      <h3 className="font-bold text-lg mb-4">PROJECT SECURITY</h3>
+
+      <div className="grid grid-cols-2 gap-y-2 mb-4 text-sm">
+        <span>Critical</span>
+        <span className="text-right font-medium">{summary.critical} 🔴</span>
+        <span>High</span>
+        <span className="text-right font-medium">{summary.high} 🟠</span>
+        <span>Medium</span>
+        <span className="text-right font-medium">{summary.moderate} 🟡</span>
+        <span>Low</span>
+        <span className="text-right font-medium">{summary.low} 🟢</span>
+      </div>
+
+      <div className="border-t pt-4 grid grid-cols-2 gap-y-2 text-sm">
+        <span>Code Quality</span>
+        <span className="text-right font-medium">{summary.codeQualityScore}%</span>
+        <span>Security</span>
+        <span className="text-right font-medium">{summary.securityScore}%</span>
+        <span>Test Coverage</span>
+        <span className="text-right font-medium text-gray-400">N/A</span>
+        <span>Docker</span>
+        <span className={`text-right font-medium ${statusColor[summary.dockerStatus]}`}>
+          {statusIcon[summary.dockerStatus]}
+        </span>
+        <span>CI/CD</span>
+        <span className={`text-right font-medium ${statusColor[summary.cicdStatus]}`}>
+          {statusIcon[summary.cicdStatus]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }) {
   const styles = {
     pending: 'bg-gray-100 text-gray-700',
@@ -259,6 +343,8 @@ function ProjectDetail() {
   if (loading) return <p className="p-8">Chargement...</p>;
   if (error) return <p className="p-8 text-red-600">Erreur : {error}</p>;
 
+  const latestCompletedScan = scans.find((s) => s.status === 'completed');
+
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <Link to="/dashboard" className="text-blue-600 text-sm">&larr; Retour</Link>
@@ -273,6 +359,8 @@ function ProjectDetail() {
         </button>
       </div>
       <p className="text-gray-500 mb-6">{project.githubRepo}</p>
+
+      {latestCompletedScan && <SecuritySummaryCard results={latestCompletedScan.results} />}
 
       <h2 className="text-lg font-semibold mb-3">Historique des scans</h2>
       {scans.length === 0 ? (
