@@ -22,6 +22,7 @@ function ScanResults({ results }) {
   const secrets = results.secrets;
   const codeQuality = results.codeQuality;
   const docker = results.docker;
+  const cicd = results.cicd;
 
   return (
     <div className="mt-3 space-y-3">
@@ -124,6 +125,35 @@ function ScanResults({ results }) {
           </div>
         ) : (
           <p className="text-sm text-gray-500">Aucun Dockerfile trouvé.</p>
+        )}
+      </div>
+
+      <div className="bg-gray-50 rounded p-4">
+        <h4 className="font-medium mb-2">Configuration CI/CD</h4>
+        {cicd?.found ? (
+          <div className="space-y-3">
+            {cicd.workflows.map((wf, i) => (
+              <div key={i}>
+                <p className="text-sm font-medium text-gray-600 mb-1">⚙ {wf.file}</p>
+                {wf.parseError ? (
+                  <p className="text-red-600 text-sm pl-4">Erreur de parsing : {wf.parseError}</p>
+                ) : wf.issues.length > 0 ? (
+                  <ul className="space-y-1 text-sm pl-4">
+                    {wf.issues.map((issue, j) => (
+                      <li key={j} className="text-gray-700">
+                        <span className="uppercase text-xs font-medium text-orange-600">{issue.severity}</span>{' '}
+                        {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Aucun workflow GitHub Actions trouvé.</p>
         )}
       </div>
     </div>

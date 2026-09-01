@@ -11,6 +11,7 @@ const prisma = require('../lib/prisma');
 const { ESLint } = require('eslint');
 const js = require('@eslint/js');
 const sonarjs = require('eslint-plugin-sonarjs');
+const yaml = require('js-yaml'); 
 
 const execAsync = promisify(exec);
 // Cherche tous les dossiers contenant un fichier donné (ex: package.json, Dockerfile),
@@ -222,6 +223,66 @@ async function runHadolint(repoPath) {
 
   return { dockerfileFound: true, locations: results };
 }
+async function runCicdAnalysis(repoPath) {
+  const workflowsDir = path.join(repoPath, '.github', 'workflows');
+  const exists = await fs.pathExists(workflowsDir);
+
+  if (!exists) {
+    return { found: false, workflows: [] };
+  }
+
+  const files = await fs.readdir(workflowsDir);
+  const ymlFiles = files.filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+
+  if (ymlFiles.length === 0) {
+    return { found: false, workflows: [] };
+  }
+
+  const workflows = [];
+
+  for (const file of ymlFiles) {
+    const filePath = path.join(workflowsDir, file);
+    const issues = [];
+
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const parsed = yaml.load(content);
+
+      // Vérifie les versions d'actions non figées (ex: @main, @master, @latest au lieu d'un tag/SHA)
+      const actionRefs = [...content.matchAll(/uses:\s*([^\s@]+)@([^\s]+)/g)];
+      for (const [, action, ref] of actionRefs) {
+        if (['main', 'master', 'latest', 'HEAD'].includes(ref)) {
+          issues.push({
+            severity: 'warning',
+            message: `L'action "${action}" utilise une référence mouvante ("${ref}") plutôt qu'un tag de version figé — risque de supply chain attack.`,
+          });
+        }
+      }
+
+      // Vérifie l'usage de secrets en clair dans des commandes run (pattern basique)
+      if (/run:\s*.*\$\{\{\s*secrets\./i.test(content) && /echo|print/i.test(content)) {
+        issues.push({
+          severity: 'warning',
+          message: 'Un secret semble être affiché (echo/print) dans une commande — risque de fuite dans les logs CI.',
+        });
+      }
+
+      // Vérifie la présence de permissions explicites (bonne pratique de sécurité)
+      if (!parsed?.permissions) {
+        issues.push({
+          severity: 'info',
+          message: 'Aucune section "permissions" définie — le workflow utilise les permissions par défaut, potentiellement trop larges.',
+        });
+      }
+
+      workflows.push({ file, issues, parseError: null });
+    } catch (err) {
+      workflows.push({ file, issues: [], parseError: err.message });
+    }
+  }
+
+  return { found: true, workflows };
+}
 
 async function processScan(job) {
   const { scanId, githubRepo } = job.data;
@@ -263,14 +324,18 @@ async function processScan(job) {
        // Analyse : qualité de code (ESLint)
     const eslintResults = await runEslint(tempDir);
 
-    // Analyse : Dockerfile (Hadolint)
+       // Analyse : Dockerfile (Hadolint)
     const dockerResults = await runHadolint(tempDir);
+
+    // Analyse : configuration CI/CD (GitHub Actions)
+    const cicdResults = await runCicdAnalysis(tempDir);
 
     const results = {
       dependencies: auditResults,
       secrets: gitleaksResults,
       codeQuality: eslintResults,
       docker: dockerResults,
+      cicd: cicdResults,
     };
 
     await prisma.scan.update({
