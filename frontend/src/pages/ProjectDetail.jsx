@@ -18,26 +18,37 @@ function StatusBadge({ status }) {
 
 function ScanResults({ results }) {
   if (!results) return null;
-  const meta = results.dependencies?.metadata;
-  const vulns = meta?.vulnerabilities;
+  const dependencies = results.dependencies;
   const secrets = results.secrets;
   const codeQuality = results.codeQuality;
+  const docker = results.docker;
 
   return (
     <div className="mt-3 space-y-3">
       <div className="bg-gray-50 rounded p-4">
         <h4 className="font-medium mb-2">Dépendances</h4>
-        {meta ? (
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <p>Total dépendances : {meta.dependencies?.total ?? '—'}</p>
-            <p>Vulnérabilités totales : {vulns?.total ?? 0}</p>
-            <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
-            <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
-            <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
-            <p className="text-blue-600">Low : {vulns?.low ?? 0}</p>
+        {dependencies?.found ? (
+          <div className="space-y-3">
+            {dependencies.locations.map((loc, i) => {
+              const meta = loc.audit?.metadata;
+              const vulns = meta?.vulnerabilities;
+              return (
+                <div key={i}>
+                  <p className="text-sm font-medium text-gray-600 mb-1">📁 {loc.location}</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm pl-4">
+                    <p>Total dépendances : {meta?.dependencies?.total ?? '—'}</p>
+                    <p>Vulnérabilités totales : {vulns?.total ?? 0}</p>
+                    <p className="text-red-600">Critical : {vulns?.critical ?? 0}</p>
+                    <p className="text-orange-600">High : {vulns?.high ?? 0}</p>
+                    <p className="text-yellow-600">Moderate : {vulns?.moderate ?? 0}</p>
+                    <p className="text-blue-600">Low : {vulns?.low ?? 0}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">Pas de données de dépendances.</p>
+          <p className="text-sm text-gray-500">Aucun package.json trouvé.</p>
         )}
       </div>
 
@@ -86,6 +97,33 @@ function ScanResults({ results }) {
           </div>
         ) : (
           <p className="text-sm text-gray-500">Pas de données.</p>
+        )}
+      </div>
+
+      <div className="bg-gray-50 rounded p-4">
+        <h4 className="font-medium mb-2">Docker</h4>
+        {docker?.dockerfileFound ? (
+          <div className="space-y-3">
+            {docker.locations.map((loc, i) => (
+              <div key={i}>
+                <p className="text-sm font-medium text-gray-600 mb-1">📁 {loc.location}</p>
+                {loc.issues.length > 0 ? (
+                  <ul className="space-y-1 text-sm pl-4">
+                    {loc.issues.map((issue, j) => (
+                      <li key={j} className="text-gray-700">
+                        <span className="uppercase text-xs font-medium text-orange-600">{issue.level}</span>{' '}
+                        L{issue.line} ({issue.rule}) — {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-green-600 text-sm pl-4">✓ Aucun problème détecté</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Aucun Dockerfile trouvé.</p>
         )}
       </div>
     </div>
