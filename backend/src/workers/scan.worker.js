@@ -41,7 +41,35 @@ async function runNpmAudit(repoPath) {
     return { error: err.message };
   }
 }
+async function runGitleaks(repoPath) {
+  try {
+    const reportPath = path.join(repoPath, 'gitleaks-report.json');
+    await execAsync(
+      `gitleaks git --report-format json --report-path "${reportPath}" --exit-code 0`,
+      { cwd: repoPath, timeout: 60000 }
+    );
 
+    const reportExists = await fs.pathExists(reportPath);
+    if (!reportExists) {
+      return { secretsFound: 0, findings: [] };
+    }
+
+    const findings = await fs.readJson(reportPath);
+
+    // On ne garde que les infos utiles (jamais le secret en clair !)
+    const sanitizedFindings = findings.map((f) => ({
+      description: f.Description,
+      file: f.File,
+      line: f.StartLine,
+      rule: f.RuleID,
+      commit: f.Commit,
+    }));
+
+    return { secretsFound: sanitizedFindings.length, findings: sanitizedFindings };
+  } catch (err) {
+    return { error: err.message, secretsFound: 0, findings: [] };
+  }
+}
 async function processScan(job) {
   const { scanId, githubRepo } = job.data;
   const tempDir = path.join(os.tmpdir(), `scan-${scanId}`);
@@ -69,8 +97,12 @@ async function processScan(job) {
     // Analyse : dépendances (npm audit)
     const auditResults = await runNpmAudit(tempDir);
 
+    // Analyse : secrets (gitleaks)
+    const gitleaksResults = await runGitleaks(tempDir);
+
     const results = {
       dependencies: auditResults,
+      secrets: gitleaksResults,
     };
 
     await prisma.scan.update({
