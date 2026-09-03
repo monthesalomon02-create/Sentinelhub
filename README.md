@@ -2,10 +2,12 @@
 
 Plateforme d'analyse automatique de sécurité et de qualité pour dépôts GitHub. Connectez votre repo, et Inspecteur Mr Code passe votre code à la loupe : dépendances vulnérables, secrets exposés, qualité de code, configuration Docker et pipelines CI/CD — avec des explications en langage naturel générées par IA.
 
+**🌐 Démo en ligne : [sentinelhub-xi.vercel.app](https://sentinelhub-xi.vercel.app)**
+
 ## Fonctionnalités
 
 - **Authentification GitHub OAuth** — connexion sécurisée via son compte GitHub
-- **Analyse de dépendances** — détection des vulnérabilités via `npm audit`
+- **Analyse de dépendances** — détection des vulnérabilités via `npm audit`, avec détail par paquet et suggestions de correction
 - **Détection de secrets** — scan des credentials/clés API exposés via `gitleaks`
 - **Qualité de code** — analyse statique via `ESLint` + `eslint-plugin-sonarjs`
 - **Analyse Docker** — bonnes pratiques de Dockerfile via `Hadolint`
@@ -13,6 +15,7 @@ Plateforme d'analyse automatique de sécurité et de qualité pour dépôts GitH
 - **Support mono-repo** — recherche récursive multi-dossiers (backend/frontend séparés)
 - **Explications IA** — synthèse en langage naturel des résultats via l'API Mistral
 - **Traitement asynchrone** — scans exécutés en arrière-plan via une file de jobs (BullMQ/Redis)
+- **Résumé visuel** — score de sécurité et de qualité en un coup d'œil, façon dashboard d'audit
 
 ## Stack technique
 
@@ -27,6 +30,18 @@ Plateforme d'analyse automatique de sécurité et de qualité pour dépôts GitH
 | IA | Mistral AI (mistral-small) |
 | Conteneurisation | Docker |
 
+## Déploiement
+
+| Service | Fournisseur |
+|---|---|
+| Frontend | [Vercel](https://vercel.com) |
+| API backend | [Render](https://render.com) (Web Service) |
+| Worker de scan | [Render](https://render.com) (Background Worker, image Docker custom avec gitleaks/hadolint) |
+| Base de données PostgreSQL | [Neon](https://neon.tech) |
+| Redis (file de jobs) | [Redis Cloud](https://redis.io) |
+
+Le worker tourne dans un conteneur Docker dédié (`backend/Dockerfile.worker`) qui installe Node.js, Git, gitleaks et hadolint, séparé de l'API pour permettre un traitement asynchrone sans bloquer les requêtes HTTP.
+
 ## Architecture
 
 sentinelhub/
@@ -40,6 +55,7 @@ sentinelhub/
 │ │ └── workers/ # Worker de scan (clone, analyses, sauvegarde)
 │ ├── prisma/
 │ │ └── schema.prisma # Modèles User, Project, Scan
+│ ├── Dockerfile.worker # Image Docker du worker (gitleaks, hadolint, git)
 │ └── index.js # Point d'entrée API
 ├── frontend/
 │ └── src/
@@ -56,7 +72,11 @@ sentinelhub/
 4. Un worker dédié clone le dépôt dans un dossier temporaire isolé, exécute les 5 analyses (récursivement dans chaque sous-dossier pour les mono-repos), sauvegarde les résultats en base, puis nettoie l'environnement
 5. Les résultats sont affichés dans le dashboard, avec un résumé visuel des scores et la possibilité de générer une explication IA détaillée
 
-## Installation
+## Charte graphique
+
+Thème crème & terracotta, chaleureux et éditorial — pensé pour se démarquer des dashboards de sécurité classiques (souvent tout en sombre/rouge). Police Fraunces pour les titres, Inter pour le texte courant, JetBrains Mono pour le code. Illustration SVG originale d'un inspecteur à la loupe sur la page de connexion.
+
+## Installation locale
 
 ### Prérequis
 
@@ -81,6 +101,7 @@ GITHUB_CLIENT_SECRET=ton_client_secret
 GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
 REDIS_URL=redis://localhost:6380
 MISTRAL_API_KEY=ta_cle_mistral
+FRONTEND_URL=http://localhost:5180
 
 
 Lance PostgreSQL et Redis via Docker :
@@ -103,6 +124,13 @@ npm run worker   # Worker de scan
 ```bash
 cd frontend
 npm install
+```
+
+Crée un fichier `.env` avec :
+VITE_API_URL=http://localhost:5000/api
+
+
+```bash
 npm run dev
 ```
 
@@ -111,10 +139,10 @@ L'application est accessible sur `http://localhost:5180`.
 ## Roadmap
 
 - [ ] Tests automatisés et couverture de code
-- [ ] Gestion du refresh token GitHub OAuth
+- [ ] Gestion du refresh token GitHub OAuth (expiration après 8h)
 - [ ] Historique comparatif entre scans (évolution des scores dans le temps)
 - [ ] Export PDF des rapports de scan
 
 ## Auteur
 
-Salomon MONTHE
+Leroy Mathieu Salomon MONTHE ELAKE 
